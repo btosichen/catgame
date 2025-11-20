@@ -334,6 +334,74 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
     <script>
+        /* --- AUDIO SYSTEM (NEW) --- */
+        const AUDIO = {
+            ctx: null,
+            init: function() {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (AudioContext) {
+                    this.ctx = new AudioContext();
+                }
+            },
+            playTone: function(freq, type, duration, vol = 0.1) {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                
+                gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+                
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + duration);
+            },
+            shoot: function() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(400, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(100, this.ctx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.1);
+            },
+            explosion: function() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(100, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(10, this.ctx.currentTime + 0.3);
+                gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.3);
+            },
+            coin: function() {
+                this.playTone(1200, 'sine', 0.1, 0.1);
+                setTimeout(() => this.playTone(1800, 'sine', 0.2, 0.1), 50);
+            },
+            hit: function() {
+                this.playTone(150, 'sawtooth', 0.1, 0.1);
+            },
+            levelup: function() {
+                if (!this.ctx) return;
+                const notes = [523.25, 659.25, 783.99, 1046.50]; // C Major Arpeggio
+                notes.forEach((note, i) => {
+                    setTimeout(() => this.playTone(note, 'square', 0.2, 0.1), i * 100);
+                });
+            }
+        };
+
         /* --- JAVASCRIPT GAME ENGINE --- */
 
         /** * CONFIGURATION & CONSTANTS
@@ -498,6 +566,9 @@
         function spawnBullet(targetPos) {
             const count = GAME.player.projectiles;
             
+            // Sound: Shoot
+            AUDIO.shoot();
+
             for(let i = 0; i < count; i++) {
                 // Simple Spread logic
                 const offsetAngle = (i - (count-1)/2) * 0.2;
@@ -633,6 +704,9 @@
          */
         function checkLevelUp() {
             if (GAME.player.xp >= GAME.player.xpNext) {
+                // Sound: Level Up
+                AUDIO.levelup();
+
                 GAME.player.xp -= GAME.player.xpNext;
                 GAME.player.lvl++;
                 GAME.player.xpNext = Math.floor(GAME.player.xpNext * 1.3);
@@ -686,7 +760,7 @@
         function animate() {
             requestAnimationFrame(animate);
             
-            // 1. Always render (FIXED: Added this so screen is not black)
+            // 1. Always render
             renderer.render(scene, camera);
 
             // 2. Only update Logic if Active and Not Paused
@@ -756,6 +830,8 @@
                         scene.remove(b.mesh);
                         GAME.bullets.splice(i, 1);
                         if (e.hp <= 0) {
+                            // Sound: Explosion
+                            AUDIO.explosion();
                             spawnParticles(e.mesh.position, 0xff3333, 8);
                             spawnDrop(e.mesh.position, Math.random() > 0.8 ? 'coin' : 'xp');
                             scene.remove(e.mesh);
@@ -780,6 +856,8 @@
                 e.mesh.lookAt(playerMesh.position);
                 if (e.mesh.position.distanceTo(playerMesh.position) < 1.2) {
                     GAME.player.hp -= 20 * delta;
+                    // Sound: Hit (Throttle slightly to avoid ear damage)
+                    if (Math.random() > 0.9) AUDIO.hit();
                 }
             });
 
@@ -791,6 +869,9 @@
                 if (dist < 5) {
                     d.mesh.position.lerp(playerMesh.position, 5 * delta);
                     if (dist < 1) {
+                        // Sound: Coin/XP
+                        AUDIO.coin();
+
                         if(d.type === 'xp') GAME.player.xp += d.value;
                         else GAME.player.coins += d.value;
                         scene.remove(d.mesh);
@@ -821,6 +902,10 @@
          * MANAGEMENT
          */
         function startGame() {
+            // Initialize Audio Context (Required by browsers on interaction)
+            if (!AUDIO.ctx) AUDIO.init();
+            if (AUDIO.ctx && AUDIO.ctx.state === 'suspended') AUDIO.ctx.resume();
+
             // Reset Stats
             GAME.player.hp = 100;
             GAME.player.maxHp = 100;
