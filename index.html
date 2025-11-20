@@ -836,14 +836,16 @@
                     <div class="upgrade-desc">${opt.desc}</div>
                 `;
                 card.onclick = () => {
-                    opt.apply();
-                    document.getElementById('levelup-screen').classList.add('hidden');
-                    gameState.status = 'PLAYING';
-                    lastTime = performance.now(); // Reset time to prevent jump
-                    updateHUD();
-                };
-                container.appendChild(card);
-            });
+    opt.apply();
+    document.getElementById('levelup-screen').classList.add('hidden');
+
+    gameState.status = 'PLAYING';
+    lastTime = performance.now(); // 重設時間，避免 dt 突然變超大
+    updateHUD();
+
+    // ⭐ 重新啟動動畫迴圈
+    requestAnimationFrame(animate);
+};
 
             document.getElementById('levelup-screen').classList.remove('hidden');
         }
@@ -902,22 +904,23 @@
 
         // --- ANIMATION LOOP ---
         function animate(now) {
-            if (gameState.status !== 'PLAYING') return;
-            requestAnimationFrame(animate);
+    requestAnimationFrame(animate); // 先排下一幀
 
-            const dt = Math.min((now - lastTime) / 1000, 0.1); // Cap dt
-            lastTime = now;
-            gameState.time += dt;
+    if (gameState.status !== 'PLAYING') return; // 不在 PLAYING 就只是不更新遊戲邏輯
 
-            updatePlayer(dt);
-            updateEnemies(dt);
-            updateBullets(dt);
-            updateLoot(dt);
-            updateParticles(dt);
-            
-            updateHUD();
-            renderer.render(scene, camera);
-        }
+    const dt = Math.min((now - lastTime) / 1000, 0.1);
+    lastTime = now;
+    gameState.time += dt;
+
+    updatePlayer(dt);
+    updateEnemies(dt);
+    updateBullets(dt);
+    updateLoot(dt);
+    updateParticles(dt);
+    
+    updateHUD();
+    renderer.render(scene, camera);
+}
 
         // Initialize
         initThree();
@@ -925,3 +928,4 @@
     </script>
 </body>
 </html>
+
